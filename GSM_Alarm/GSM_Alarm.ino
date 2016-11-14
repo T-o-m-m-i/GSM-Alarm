@@ -13,21 +13,23 @@
 CallGSM call;
 SMSGSM sms;
 
-
 #define DHTPIN 2
 #define DHTTYPE DHT22
+
+#define NUMBER_LENGTH 20
+#define SMS_LENGTH 100
 
 DHT dht(DHTPIN, DHTTYPE);
 
 
 bool started=false;
-char smsbuffer[100];
+char smsbuffer[SMS_LENGTH];
 
 char sms_received_position;
-char sms_received_number[20];
-char sms_received[100];
+char sms_received_number[NUMBER_LENGTH];
+char sms_received[SMS_LENGTH];
 
-char num[20];
+char num[NUMBER_LENGTH];
 byte stat = 0;
 int value = 0;
 int pin = 1;
@@ -62,7 +64,7 @@ void setup()
 	if(started)
 	{
 		//Check if the right number is stored in SIM if not then store them
-		for(int i = 0; i < numbers; i++)
+		for(unsigned int i = 0; i < numbers; i++)
 		{
 			if(gsm.ComparePhoneNumber(i+1, number[i]) == 0)
 			{
@@ -129,7 +131,7 @@ void loop()
 		if (sms_received_position)
 		{
 			// read new SMS
-			sms.GetSMS(sms_received_position, sms_received_number, sizeof(sms_received_number), sms_received, sizeof(sms_received));
+			sms.GetSMS(sms_received_position, sms_received_number, NUMBER_LENGTH, sms_received, SMS_LENGTH);
 			// now we have phone number string in phone_num
 			// and SMS text in sms_text
 
@@ -140,21 +142,7 @@ void loop()
 			}
 		}
 
-
-		//Read if there are messages on SIM card and print them.
-		/**  deprecated method
-		if(gsm.readSMS(smsbuffer, 160, n, 20))
-		{
-			Serial.println(n);
-			Serial.println(smsbuffer);
-		}
-		**/
-		//get 1st sms
-		//sms.GetSMS(1,n,20,smsbuffer,160);
-		//Serial.println(n);
-		//Serial.println(smsbuffer);
-
-		delay(5000);
+		delay(2000);
 
 		//Measuring
 		if ((unsigned long)(millis() - previousMillis) >= interval)
@@ -191,7 +179,7 @@ void loop()
 				if(temperature <= 14.0 && warnSent == false)
 				{
 					//Send an SMS
-					/*String message = "KYLMÄÄ!!! \nLämpötila: " + String(temperature) +
+					/*String message = "KYLMÄÄ! \nLämpötila: " + String(temperature) +
 												"\nKosteus: " + String(humidity);
 					message.toCharArray(smsbuffer,160);
 					Serial.println(smsbuffer);
