@@ -7,7 +7,7 @@ int InetGSM::httpGET(const char* server, int port, const char* path, char* resul
 {
      boolean connected=false;
      int n_of_at=0;
-     int length_write;
+     //int length_write;
      char end_c[2];
      end_c[0]=0x1a;
      end_c[1]='\0';
@@ -67,7 +67,7 @@ int InetGSM::httpPOST(const char* server, int port, const char* path, const char
      boolean connected=false;
      int n_of_at=0;
      char itoaBuffer[8];
-     int num_char;
+     //int num_char;
      char end_c[2];
      end_c[0]=0x1a;
      end_c[1]='\0';
@@ -299,7 +299,7 @@ int InetGSM::closemail()
 
 int InetGSM::attachGPRS(char* domain, char* dom1, char* dom2)
 {
-     int i=0;
+     //int i=0;
      delay(5000);
 
      //gsm._tf.setTimeout(_GSM_DATA_TOUT_);	//Timeout for expecting modem responses.

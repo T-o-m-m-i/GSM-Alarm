@@ -253,7 +253,7 @@ boolean SIMCOM900::readSMS(char* msg, int msglength, char* number, int nlength)
 
 boolean SIMCOM900::readCall(char* number, int nlength)
 {
-     int index;
+     //int index;
 
      if (getStatus()==IDLE)
           return false;
@@ -266,7 +266,7 @@ boolean SIMCOM900::readCall(char* number, int nlength)
           _tf.getString("", "\"", number, nlength);
 #endif
 #ifdef MEGA
-          _cell.getString("", "\"", number, nlength);
+          _cell.getString((char *)"", (char *)"\"", number, nlength);
 #endif
           SimpleWriteln(F("ATH"));
           delay(1000);
@@ -347,10 +347,10 @@ int SIMCOM900::getCCI(char *cci)
 
      //Read response from modem
 #ifdef UNO
-     _tf.getString("AT+QCCID\r\r\r\n","\r\n",cci, 21);
+     _tf.getString((char *)"AT+QCCID\r\r\r\n",(char *)"\r\n",cci, 21);
 #endif
 #ifdef MEGA
-     _cell.getString("AT+QCCID\r\r\r\n","\r\n",cci, 21);
+     _cell.getString((char *)"AT+QCCID\r\r\r\n",(char *)"\r\n",cci, 21);
 #endif
 
      //Expect str_ok.
@@ -728,7 +728,7 @@ byte GSM::IsUserButtonPushed(void)
      //}
      //else ret_val = 0;
      //SetCommLineStatus(CLS_FREE);
-     //return (ret_val);
+     return (ret_val);
 }
 
 

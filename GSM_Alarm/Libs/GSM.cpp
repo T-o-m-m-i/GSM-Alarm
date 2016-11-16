@@ -52,7 +52,7 @@ int GSM::begin(long baud_rate)
           baud_rate=9600;
      }
 #endif
-     int response=-1;
+     //int response=-1;
      int cont=0;
      boolean norep=true;
      boolean turnedON=false;
@@ -725,7 +725,7 @@ char GSM::InitSMSMemory(void)
 
 int GSM::isIP(const char* cadena)
 {
-     int i;
+     unsigned int i;
      for (i=0; i<strlen(cadena); i++)
           if (!(cadena[i]=='.' || ( cadena[i]>=48 && cadena[i] <=57)))
                return 0;

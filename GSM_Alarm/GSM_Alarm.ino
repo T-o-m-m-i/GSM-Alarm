@@ -33,17 +33,19 @@ char sms_requesting_number[NUMBER_LENGTH];
 
 char call_received_number[NUMBER_LENGTH];
 byte call_received_status = 0;
-char value_str[5];
 
 float temperature = 0;
 float humidity = 0;
 
 bool warnSent = false;
-byte failedDHT = 0;
+byte timesDHTfailed = 0;
+bool failedAC = false;
+
 
 const unsigned long interval = 60000;  //1min
 unsigned long previousMillis = 0;
 
+//---------------------------------------------------------------------------------------------
 void setup()
 {
 	dht.begin();
@@ -78,78 +80,24 @@ void setup()
 	}
 
 }
-
+//---------------------------------------------------------------------------------------------
 void loop()
 {
 	if(started)
 	{
 		//Chekcs the status of the incoming call
-		call_received_status = call.CallStatusWithAuth(call_received_number, 1, NUMBERS);
+		checkCallStatus();
 
-		if(call_received_status == CALL_INCOM_VOICE_AUTH)
-		{
-			Serial.println("Auth nro. : " + String(call_received_number));
-			delay(2000);
+		delay(1000);
 
-			call.PickUp();
-			delay(1000);
-			call.HangUp();
+		//Check unread messages
+		checkUnreadMessages();
 
-			delay(2000);
+		delay(1000);
 
-			//Send an SMS to the calling number with the values red previously.
-			String message = "Lämpötila: " + String(temperature) +
-							"\nKosteus: " + String(humidity);
-			message.toCharArray(smsbuffer, 100);
-			Serial.println(smsbuffer);
-			//sms.SendSMS(number, smsbuffer);
+		//Is AC failed
+		checkAC();
 
-		}
-		else if(call_received_status == CALL_INCOM_VOICE_NOT_AUTH)
-		{
-			Serial.println("Ei Auth nro. : " + String(call_received_number));
-			delay(2000);
-
-			Serial.println("Picking Up!");
-			call.PickUp();
-			Serial.println("Hanging Up!");
-			call.HangUp();
-
-			delay(2000);
-		}
-		else if(call_received_status == CALL_NONE)
-		{
-			Serial.println("Ei soittoa.");
-		}
-		delay(2000);
-
-		//Check if there is unread messages
-		sms_received_position = sms.IsSMSPresent(SMS_UNREAD);
-
-		if (sms_received_position)
-		{
-			// Read the new SMS
-			sms.GetSMS(sms_received_position, sms_received_number, NUMBER_LENGTH, sms_received_msg, SMS_LENGTH);
-
-			//SALDO
-			if((sms_received_number == number[0]) || (sms_received_number == number[1]))
-			{
-				if(strcasecmp(sms_received_msg, "saldo") == 0)
-				{
-					//Save requesting number
-					sms_requesting_number = sms_received_number;
-
-					//Send SALDO to the operator
-					sms.SendSMS(OPERATOR, "PREPAID SALDO");
-				}
-			}
-			else if(sms_received_number == OPERATOR)
-			{
-				sms.SendSMS(sms_requesting_number, sms_received_msg);
-			}
-		}
-
-		delay(2000);
 
 		//Measuring
 		if ((unsigned long)(millis() - previousMillis) >= interval)
@@ -164,17 +112,17 @@ void loop()
 				Serial.println("Failed to read from DHT sensor!");
 				delay(1000);
 
-				failedDHT++;
-				if(failedDHT > 20)
+				timesDHTfailed++;
+				if(timesDHTfailed > 20)
 				{
 					Serial.println("Something wrong with the DHT.");
-					failedDHT = 0;
+					timesDHTfailed = 0;
 				}
 				return;
 			}
 			else
 			{
-				failedDHT = 0;
+				timesDHTfailed = 0;
 
 				Serial.print("Humidity: ");
 				Serial.print(humidity);
@@ -201,8 +149,105 @@ void loop()
 
 				previousMillis = millis();
 
-				Serial.println("LÄHETETÄÄN PILVEEN!");
+
+				Serial.println("SENDING TO CLOUD.");
+				//Send to cloud
+				//sendToCloud();
 			}
 		}
      }
+}
+
+//Is AC failed
+//http://www.insidegadgets.com/2012/01/08/non-contact-blackout-detector/
+//http://harizanov.com/2013/08/non-contact-ac-detection/
+void checkAC(void)
+{
+	byte detected = 0;
+
+	for( int i=0; i < 30; i++)
+	{
+		unsigned int ac = analogRead(A10);
+		if(ac > 0)
+		{
+			detected++;
+			delay(2);
+		}
+	}
+	if(failedAC == true)
+	{
+
+	}
+}
+
+//Chekcs the status of the incoming call
+void checkCallStatus(void)
+{
+	call_received_status = call.CallStatusWithAuth(call_received_number, 1, NUMBERS);
+
+	if(call_received_status == CALL_INCOM_VOICE_AUTH)
+	{
+		Serial.println("Auth nro. : " + String(call_received_number));
+		delay(2000);
+
+		call.PickUp();
+		delay(1000);
+		call.HangUp();
+
+		delay(2000);
+
+		//Send an SMS to the calling number with the values red previously.
+		String message = "Lämpötila: " + String(temperature) +
+						"\nKosteus: " + String(humidity);
+		message.toCharArray(smsbuffer, 100);
+		Serial.println(smsbuffer);
+		sms.SendSMS(call_received_number, smsbuffer);
+
+	}
+	else if(call_received_status == CALL_INCOM_VOICE_NOT_AUTH)
+	{
+		Serial.println("UnAuth nro. : " + String(call_received_number));
+		delay(2000);
+
+		Serial.println("Picking Up!");
+		call.PickUp();
+		Serial.println("Hanging Up!");
+		call.HangUp();
+
+		delay(2000);
+	}
+	else if(call_received_status == CALL_NONE)
+	{
+		Serial.println("Ei soittoa.");
+	}
+}
+
+//Check unread messages
+void checkUnreadMessages(void)
+{
+	sms_received_position = sms.IsSMSPresent(SMS_UNREAD);
+
+	if (sms_received_position)
+	{
+		// Read the new SMS
+		sms.GetSMS(sms_received_position, sms_received_number, NUMBER_LENGTH, sms_received_msg, SMS_LENGTH);
+
+		//SALDO
+		if((sms_received_number == number[0]) || (sms_received_number == number[1]))
+		{
+			if(strcasecmp(sms_received_msg, "saldo") == 0)
+			{
+				//Save requesting number
+				//strcpy(sms_received_number, sms_requesting_number);
+				//sms_requesting_number = sms_received_number;
+
+				//Send SALDO to the operator
+				sms.SendSMS(operatorNumber, prepaidMsg);
+			}
+		}
+		else if(sms_received_number == operatorNumber)
+		{
+			sms.SendSMS(sms_requesting_number, sms_received_msg);
+		}
+	}
 }
