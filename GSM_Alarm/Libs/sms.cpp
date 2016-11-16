@@ -24,7 +24,7 @@ an example of usage:
         GSM gsm;
         gsm.SendSMS("00XXXYYYYYYYYY", "SMS text");
 **********************************************************/
-char SMSGSM::SendSMS(char *number_str, char *message_str)
+char SMSGSM::SendSMS(char const *number_str, char const *message_str)
 {
      if(strlen(message_str)>159)
           Serial.println(F("Don't send message longer than 160 characters"));

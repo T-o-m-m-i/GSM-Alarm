@@ -248,9 +248,9 @@ public:
 
      // Phonebook's methods
      char GetPhoneNumber(byte position, char *phone_number);
-     char WritePhoneNumber(byte position, char *phone_number);
+     char WritePhoneNumber(byte position, const char *phone_number);
      char DelPhoneNumber(byte position);
-     char ComparePhoneNumber(byte position, char *phone_number);
+     char ComparePhoneNumber(byte position, const char *phone_number);
 
      // returns registration state
      byte IsRegistered(void);

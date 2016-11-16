@@ -6,7 +6,7 @@
 class SMSGSM {
 public:
      // SMS's methods
-     char SendSMS(char *number_str, char *message_str);
+     char SendSMS(const char *number_str, const char *message_str);
      char SendSMS(byte sim_phonebook_position, char *message_str);
      char IsSMSPresent(byte required_status);
      char GetSMS(byte position, char *phone_number,byte max_phone_len, char *SMS_text, byte max_SMS_len);

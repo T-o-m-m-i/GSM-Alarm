@@ -191,7 +191,9 @@ boolean SIMCOM900::readSMS(char* msg, int msglength, char* number, int nlength)
      if(gsm.IsStringReceived("+CMGL")) {
 
           //index
-          p_char = strchr((char *)(gsm.comm_buf),'+CMGL');
+          //p_char = strchr((char *)(gsm.comm_buf),'+CMGL');
+          p_char = strstr((char *)(gsm.comm_buf),"+CMGL");
+
           p_char1 = p_char+3;  //we are on the first char of string
           p_char = p_char1+1;
           *p_char = 0;
@@ -852,7 +854,7 @@ return:
         0 - phone number was not written
         1 - phone number was written
 **********************************************************/
-char GSM::WritePhoneNumber(byte position, char *phone_number)
+char GSM::WritePhoneNumber(byte position, const char *phone_number)
 {
      char ret_val = -1;
 
@@ -983,7 +985,7 @@ an example of usage:
           #endif
         }
 **********************************************************/
-char GSM::ComparePhoneNumber(byte position, char *phone_number)
+char GSM::ComparePhoneNumber(byte position, const char *phone_number)
 {
      char ret_val = -1;
      char sim_phone_number[20];
