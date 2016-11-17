@@ -13,6 +13,9 @@ public:
 
      char GetAuthorizedSMS(byte position, char *phone_number, byte max_phone_len, char *SMS_text, byte max_SMS_len,
                            byte first_authorized_pos, byte last_authorized_pos);
+     char GetSMSwithDate(byte position, char *phone_number,byte max_phone_len, char *SMS_text, byte max_SMS_len,
+    		 	 	 	 char *Date_stamp, byte max_Date_len);
+
      char DeleteSMS(byte position);
 
 };

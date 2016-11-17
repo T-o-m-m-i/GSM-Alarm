@@ -354,7 +354,7 @@ char SMSGSM::GetSMS(byte position, char *phone_number,byte max_phone_len, char *
                  strcpy(phone_number, (char *)(p_char1));
                }else{
                  memcpy(phone_number,(char *)p_char1,(max_phone_len-1));
-                 phone_number[max_phone_len]=0;
+                 phone_number[max_phone_len-1]=0;
                }
           }
 
@@ -393,7 +393,7 @@ char SMSGSM::GetSMS(byte position, char *phone_number,byte max_phone_len, char *
                     // (max_SMS_len-1) because we need 1 position for the 0x00 as finish
                     // string character
                     memcpy(SMS_text, (char *)(p_char), (max_SMS_len-1));
-                    SMS_text[max_SMS_len] = 0; // finish string
+                    SMS_text[max_SMS_len-1] = 0; // finish string
                }
           }
           break;
@@ -510,6 +510,145 @@ char SMSGSM::GetAuthorizedSMS(byte position, char *phone_number,byte max_phone_l
      return (ret_val);
 }
 
+char SMSGSM::GetSMSwithDate(byte position, char *phone_number,byte max_phone_len, char *SMS_text, byte max_SMS_len,
+                          char *Date_stamp, byte max_Date_len)
+{
+  char ret_val = -1;
+ char *p_char;
+ char *p_char1;
+ byte len;
+
+ if (position == 0) return (-3);
+ if (CLS_FREE != gsm.GetCommLineStatus()) return (ret_val);
+ gsm.SetCommLineStatus(CLS_ATCMD);
+ phone_number[0] = 0;  // end of string for now
+ ret_val = GETSMS_NO_SMS; // still no SMS
+
+ //send "AT+CMGR=X" - where X = position
+ gsm.SimpleWrite(F("AT+CMGR="));
+ gsm.SimpleWriteln((int)position);
+
+ // 5000 msec. for initial comm tmout
+ // 100 msec. for inter character tmout
+ switch (gsm.WaitResp(5000, 100, "+CMGR")) {
+ case RX_TMOUT_ERR:
+      // response was not received in specific time
+      ret_val = -2;
+      break;
+
+ case RX_FINISHED_STR_NOT_RECV:
+      // OK was received => there is NO SMS stored in this position
+      if(gsm.IsStringReceived("OK")) {
+           // there is only response <CR><LF>OK<CR><LF>
+           // => there is NO SMS
+           ret_val = GETSMS_NO_SMS;
+      } else if(gsm.IsStringReceived("ERROR")) {
+           // error should not be here but for sure
+           ret_val = GETSMS_NO_SMS;
+      }
+      break;
+
+ case RX_FINISHED_STR_RECV:
+      // find out what was received exactly
+
+      //response for new SMS:
+      //<CR><LF>+CMGR: "REC UNREAD","+XXXXXXXXXXXX",,"02/03/18,09:54:28+40"<CR><LF>
+      //There is SMS text<CR><LF>OK<CR><LF>
+      if(gsm.IsStringReceived("\"REC UNREAD\"")) {
+           // get phone number of received SMS: parse phone number string
+           // +XXXXXXXXXXXX
+           // -------------------------------------------------------
+           ret_val = GETSMS_UNREAD_SMS;
+      }
+      //response for already read SMS = old SMS:
+      //<CR><LF>+CMGR: "REC READ","+XXXXXXXXXXXX",,"02/03/18,09:54:28+40"<CR><LF>
+      //There is SMS text<CR><LF>
+      else if(gsm.IsStringReceived("\"REC READ\"")) {
+           // get phone number of received SMS
+           // --------------------------------
+           ret_val = GETSMS_READ_SMS;
+      } else {
+           // other type like stored for sending..
+           ret_val = GETSMS_OTHER_SMS;
+      }
+
+      // extract phone number string
+      // ---------------------------
+      p_char = strchr((char *)(gsm.comm_buf),',');
+      p_char1 = p_char+2; // we are on the first phone number character
+      p_char = strchr((char *)(p_char1),'"');
+      if (p_char != NULL) {
+           *p_char = 0; // end of string
+           len = strlen(p_char1);
+           if(len < max_phone_len){
+             strcpy(phone_number, (char *)(p_char1));
+           }else{
+             memcpy(phone_number,(char *)p_char1,(max_phone_len-1));
+             phone_number[max_phone_len-1]=0;
+           }
+      }
+
+      // extract Date string
+      // ---------------------------
+      p_char = strchr((char *)(p_char+1),',');
+      p_char = strchr((char *)(p_char+1),','); // Pass the 2 Comas
+      p_char = strchr((char *)(p_char),'"');
+      p_char1 = p_char + 1; // reach First character of Date
+      p_char = strchr((char *)(p_char1),0x0d) - 1;
+      if (p_char != NULL) {
+        *p_char = 0;
+        len = strlen(p_char1);
+        if(len < max_Date_len){
+          strcpy(Date_stamp, (char *)(p_char1));
+        }else{
+          memcpy(Date_stamp,(char *)p_char1,(max_Date_len-1));
+          Date_stamp[max_Date_len-1]=0;
+        }
+      }
+
+      // get SMS text and copy this text to the SMS_text buffer
+      // ------------------------------------------------------
+      p_char = strchr(p_char+1, 0x0a);  // find <LF>
+      if (p_char != NULL) {
+           // next character after <LF> is the first SMS character
+           p_char++; // now we are on the first SMS character
+
+           // find <CR> as the end of SMS string
+           p_char1 = strchr((char *)(p_char), 0x0d);
+           if (p_char1 != NULL) {
+                // finish the SMS text string
+                // because string must be finished for right behaviour
+                // of next strcpy() function
+                *p_char1 = 0;
+           }
+           // in case there is not finish sequence <CR><LF> because the SMS is
+           // too long (more then 130 characters) sms text is finished by the 0x00
+           // directly in the gsm.WaitResp() routine
+
+           // find out length of the SMS (excluding 0x00 termination character)
+           len = strlen(p_char);
+
+           if (len < max_SMS_len) {
+                // buffer SMS_text has enough place for copying all SMS text
+                // so copy whole SMS text
+                // from the beginning of the text(=p_char position)
+                // to the end of the string(= p_char1 position)
+                strcpy(SMS_text, (char *)(p_char));
+           } else {
+                // buffer SMS_text doesn't have enough place for copying all SMS text
+                // so cut SMS text to the (max_SMS_len-1)
+                // (max_SMS_len-1) because we need 1 position for the 0x00 as finish
+                // string character
+                memcpy(SMS_text, (char *)(p_char), (max_SMS_len-1));
+                SMS_text[max_SMS_len-1] = 0; // finish string
+           }
+      }
+      break;
+ }
+
+ gsm.SetCommLineStatus(CLS_FREE);
+ return (ret_val);
+}
 
 /**********************************************************
 Method deletes SMS from the specified SMS position
