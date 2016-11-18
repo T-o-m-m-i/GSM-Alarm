@@ -30,6 +30,10 @@
 
 # Files
 numbers.h
+.cproject
+.ino.cpp
+.project
 
 # Folders
 Release/
+.settings/
