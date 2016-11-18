@@ -22,10 +22,10 @@ SMSGSM sms;
 DHT dht(DHTPIN, DHTTYPE);
 
 
-bool started=false;
+bool started = false;
 char smsbuffer[SMS_LENGTH];
 
-char sms_received_position;
+char sms_received_position = 0;
 char sms_received_number[NUMBER_LENGTH];
 char sms_received_msg[SMS_LENGTH];
 
@@ -37,7 +37,8 @@ byte call_received_status = 0;
 float temperature = 0;
 float humidity = 0;
 
-bool warnSent = false;
+bool warnSentTemp = false;
+bool warnSentAC = false;
 byte timesDHTfailed = 0;
 bool failedAC = false;
 
@@ -74,9 +75,22 @@ void setup()
 				if(gsm.DelPhoneNumber(i+1))
 				{
 					gsm.WritePhoneNumber(i+1, number[i]);
+					Serial.println("Numero " + (String)number[i] + " tallennettiin.");
 				}
 			}
+			else
+			{
+				Serial.println("Numero " + (String)number[i] + " oli tallennettu.");
+			}
 		}
+
+		//Delete all SMSs
+		/*unsigned int j = 1;
+		while(sms.DeleteSMS(j))
+		{
+		Serial.println("SMS " + (String)j + " poistettiin.");
+			j++;
+		}*/
 	}
 
 }
@@ -131,20 +145,20 @@ void loop()
 				Serial.print(temperature);
 				Serial.println(" *C ");
 
-				if(temperature <= 14.0 && warnSent == false)
+				if(temperature <= 12.0 && warnSentTemp == false)
 				{
 					//Send an SMS alarm
-					String message = "KYLMÄÄ! \nLämpötila: " + String(temperature) +
+					String message = "KYLMAA!\nLampotila: " + String(temperature) +
 												"\nKosteus: " + String(humidity);
 					message.toCharArray(smsbuffer,SMS_LENGTH);
 					Serial.println(smsbuffer);
-					//sms.SendSMS(number[0], smsbuffer);
-					warnSent = true;
+					sms.SendSMS(number[0], smsbuffer);
+					warnSentTemp = true;
 				}
-				if(temperature >= 18.0 && warnSent == true)
+				if(temperature >= 18.0 && warnSentTemp == true)
 				{
-					Serial.println("Lämminnyt yli " + String(temperature) + " asteen.");
-					warnSent = false;
+					Serial.println("Lämminnyt yli 18 asteen.");
+					warnSentTemp = false;
 				}
 
 				previousMillis = millis();
@@ -174,15 +188,17 @@ void checkAC(void)
 			delay(2);
 		}
 	}
-	if(detected > 10)
+	if(detected >= 10 && warnSentAC == false)
 	{
 		failedAC = true;
 		Serial.println("AC failed.");
+		//sms.SendSMS(number[0], "Sahkot poikki. :(");
 	}
-	else
+	else if(detected < 10 && warnSentAC == true)
 	{
 		failedAC = false;
 		Serial.println("AC On.");
+		//sms.SendSMS(number[0], "Sahkot tuli takas. :)");
 	}
 }
 
@@ -196,16 +212,18 @@ void checkCallStatus(void)
 		Serial.println("Auth nro. : " + String(call_received_number));
 		delay(2000);
 
+		//Serial.println("Picking Up!");
 		call.PickUp();
-		delay(1000);
-		call.HangUp();
+		//delay(500);
 
-		delay(2000);
+		//Serial.println("Hanging Up!");
+		call.HangUp();
+		//delay(100);
 
 		//Send an SMS to the calling number with the values red previously.
-		String message = "Lämpötila: " + String(temperature) +
+		String message = "Lampotila: " + String(temperature) +
 						"\nKosteus: " + String(humidity);
-		message.toCharArray(smsbuffer, 100);
+		message.toCharArray(smsbuffer, SMS_LENGTH);
 		Serial.println(smsbuffer);
 		sms.SendSMS(call_received_number, smsbuffer);
 
@@ -231,7 +249,9 @@ void checkCallStatus(void)
 //Check unread messages
 void checkUnreadMessages(void)
 {
+	Serial.println("Checking SMSs.");
 	sms_received_position = sms.IsSMSPresent(SMS_UNREAD);
+	Serial.println("SMS position: " + sms_received_position);
 
 	if (sms_received_position)
 	{
@@ -244,8 +264,11 @@ void checkUnreadMessages(void)
 			if(strcasecmp(sms_received_msg, "saldo") == 0)
 			{
 				//Save requesting number
-				//strcpy(sms_received_number, sms_requesting_number);
+				strcpy(sms_received_number, sms_requesting_number);
 				//sms_requesting_number = sms_received_number;
+
+				//Delete the SMS
+				sms.DeleteSMS(sms_received_position);
 
 				//Send SALDO to the operator
 				sms.SendSMS(operatorNumber, prepaidMsg);
