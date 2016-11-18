@@ -174,9 +174,15 @@ void checkAC(void)
 			delay(2);
 		}
 	}
-	if(failedAC == true)
+	if(detected > 10)
 	{
-
+		failedAC = true;
+		Serial.println("AC failed.");
+	}
+	else
+	{
+		failedAC = false;
+		Serial.println("AC On.");
 	}
 }
 
