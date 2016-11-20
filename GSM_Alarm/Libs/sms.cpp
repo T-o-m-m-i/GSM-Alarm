@@ -165,9 +165,13 @@ char SMSGSM::IsSMSPresent(byte required_status)
      char *p_char;
      byte status;
 
-     if (CLS_FREE != gsm.GetCommLineStatus()) return (ret_val);
+     if (CLS_FREE != gsm.GetCommLineStatus())
+    	 return (ret_val);
+
      gsm.SetCommLineStatus(CLS_ATCMD);
      ret_val = 0; // still not present
+
+     gsm.RxInit(5000, 1500);
 
      switch (required_status) {
      case SMS_UNREAD:
@@ -183,7 +187,7 @@ char SMSGSM::IsSMSPresent(byte required_status)
 
      // 5 sec. for initial comm tmout
      // and max. 1500 msec. for inter character timeout
-     gsm.RxInit(5000, 1500);
+     //gsm.RxInit(5000, 1500);
      // wait response is finished
      do {
           if (gsm.IsStringReceived("OK")) {
@@ -219,9 +223,10 @@ char SMSGSM::IsSMSPresent(byte required_status)
                // response is:
                // +CMGL: <index>,<stat>,<oa/da>,,[,<tooa/toda>,<length>]
                // <CR><LF> <data> <CR><LF>OK<CR><LF>
+
                p_char = strchr((char *)gsm.comm_buf,':');
                if (p_char != NULL) {
-                    ret_val = atoi(p_char+1);
+                    ret_val = (char)atoi(p_char+2);
                }
           } else {
                // other response like OK or ERROR

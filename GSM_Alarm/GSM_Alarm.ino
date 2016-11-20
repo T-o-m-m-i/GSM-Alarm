@@ -3,7 +3,7 @@
 #include "SoftwareSerial.h"
 
 #include "Libs/SIM900.h"
-#include "Libs/inetGSM.h"
+//#include "Libs/inetGSM.h"
 #include "Libs/sms.h"
 #include "Libs/call.h"
 
@@ -17,7 +17,7 @@ SMSGSM sms;
 #define DHTTYPE DHT22
 
 #define NUMBER_LENGTH 20
-#define SMS_LENGTH 100
+#define SMS_LENGTH 120
 
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -25,30 +25,41 @@ DHT dht(DHTPIN, DHTTYPE);
 bool started = false;
 char smsbuffer[SMS_LENGTH];
 
-char sms_received_position = 0;
+char sms_received_position;
 char sms_received_number[NUMBER_LENGTH];
 char sms_received_msg[SMS_LENGTH];
 
 char sms_requesting_number[NUMBER_LENGTH];
 
 char call_received_number[NUMBER_LENGTH];
-byte call_received_status = 0;
+byte call_received_status;
 
 float temperature = 0;
 float humidity = 0;
 
 bool warnSentTemp = false;
 bool warnSentAC = false;
+bool warnSentDHT = false;
+bool requestSMS = false;
 byte timesDHTfailed = 0;
 bool failedAC = false;
 
 
-const unsigned long interval = 60000;  //1min
-unsigned long previousMillis = 0;
+const unsigned long interval = 300000;  //5min  15min=900000
+unsigned long previousMillis = 300000;
 
 //---------------------------------------------------------------------------------------------
 void setup()
 {
+	//Turn internal pull-ups ON to save power
+	for(unsigned int k=0; k<=54; k++)
+	{
+		if(k != 8 && k != 9)
+			pinMode(k,INPUT_PULLUP);
+	}
+
+	pinMode(13, OUTPUT);
+
 	dht.begin();
 
 	Serial.flush();
@@ -91,6 +102,7 @@ void setup()
 		Serial.println("SMS " + (String)j + " poistettiin.");
 			j++;
 		}*/
+		digitalWrite(13, LOW);
 	}
 
 }
@@ -102,15 +114,11 @@ void loop()
 		//Chekcs the status of the incoming call
 		checkCallStatus();
 
-		delay(1000);
-
 		//Check unread messages
 		checkUnreadMessages();
 
-		delay(1000);
-
 		//Is AC failed
-		checkAC();
+		//checkAC();
 
 
 		//Measuring
@@ -123,13 +131,18 @@ void loop()
 			// Check if any reads failed and exit early (to try again).
 			if (isnan(humidity) || isnan(temperature))
 			{
-				Serial.println("Failed to read from DHT sensor!");
+				Serial.println(F("Failed to read from DHT sensor!"));
 				delay(1000);
 
 				timesDHTfailed++;
 				if(timesDHTfailed > 20)
 				{
-					Serial.println("Something wrong with the DHT.");
+					Serial.println(F("Something wrong with the DHT."));
+					if(warnSentDHT == false)
+					{
+						sms.SendSMS(number[0], "Something wrong with the DHT.");
+						warnSentDHT = true;
+					}
 					timesDHTfailed = 0;
 				}
 				return;
@@ -152,19 +165,19 @@ void loop()
 												"\nKosteus: " + String(humidity);
 					message.toCharArray(smsbuffer,SMS_LENGTH);
 					Serial.println(smsbuffer);
-					sms.SendSMS(number[0], smsbuffer);
+					sms.SendSMS(number[1], smsbuffer);
 					warnSentTemp = true;
 				}
 				if(temperature >= 18.0 && warnSentTemp == true)
 				{
-					Serial.println("Lämminnyt yli 18 asteen.");
+					Serial.println(F("Lämminnyt yli 18 asteen."));
 					warnSentTemp = false;
 				}
 
 				previousMillis = millis();
 
 
-				Serial.println("SENDING TO CLOUD.");
+				//Serial.println("SENDING TO CLOUD.");
 				//Send to cloud
 				//sendToCloud();
 			}
@@ -185,7 +198,6 @@ void checkAC(void)
 		if(ac > 0)
 		{
 			detected++;
-			delay(2);
 		}
 	}
 	if(detected >= 10 && warnSentAC == false)
@@ -233,50 +245,80 @@ void checkCallStatus(void)
 		Serial.println("UnAuth nro. : " + String(call_received_number));
 		delay(2000);
 
-		Serial.println("Picking Up!");
+		Serial.println(F("Picking Up!"));
 		call.PickUp();
-		Serial.println("Hanging Up!");
+		Serial.println(F("Hanging Up!"));
 		call.HangUp();
 
 		delay(2000);
 	}
 	else if(call_received_status == CALL_NONE)
 	{
-		Serial.println("Ei soittoa.");
+		//Serial.println("Ei soittoa.");
 	}
 }
 
 //Check unread messages
+
 void checkUnreadMessages(void)
 {
-	Serial.println("Checking SMSs.");
-	sms_received_position = sms.IsSMSPresent(SMS_UNREAD);
-	Serial.println("SMS position: " + sms_received_position);
+	//Serial.println("Check SMSs.");
 
-	if (sms_received_position)
+	sms_received_position = sms.IsSMSPresent(SMS_ALL);
+	//delay(10);
+	//Serial.println("sms pos: " + (String)((int)sms_received_position));
+
+	if (sms_received_position > 0)
 	{
 		// Read the new SMS
 		sms.GetSMS(sms_received_position, sms_received_number, NUMBER_LENGTH, sms_received_msg, SMS_LENGTH);
-
+		Serial.println("SMS: " + (String)sms_received_number);
+		Serial.println("SMS: " + (String)sms_received_msg);
 		//SALDO
-		if((sms_received_number == number[0]) || (sms_received_number == number[1]))
+		if((strcmp(sms_received_number, number[0]) == 0) ||
+		(strcmp(sms_received_number, number[1]) == 0) ||
+		(strcmp(sms_received_number, number[2]) == 0) ||
+		(strcmp(sms_received_number, number[3]) == 0))
 		{
+			//Serial.println("Nro match.");
 			if(strcasecmp(sms_received_msg, "saldo") == 0)
 			{
 				//Save requesting number
 				strcpy(sms_received_number, sms_requesting_number);
-				//sms_requesting_number = sms_received_number;
+
+				//Send SALDO to the operator
+				sms.SendSMS(operatorNumber, "PREPAID SALDO");
+				//Serial.println("SALDO sent.");
 
 				//Delete the SMS
 				sms.DeleteSMS(sms_received_position);
+				requestSMS = true;
+				//Serial.println("SALDO SMS Deleted.");
+			}
+			else if(strcasecmp(sms_received_msg, "kielto") == 0)
+			{
+				//Send KIELTO to the operator
+				sms.SendSMS(operatorNumber, "KIELTO");
 
-				//Send SALDO to the operator
-				sms.SendSMS(operatorNumber, prepaidMsg);
+				//Delete the SMS
+				sms.DeleteSMS(sms_received_position);
 			}
 		}
-		else if(sms_received_number == operatorNumber)
+		else if(strcmp(sms_received_number, operatorNumber) == 0 && requestSMS == false)
+		{
+			sms.SendSMS(number[0], sms_received_msg);
+			sms.DeleteSMS(sms_received_position);
+		}
+		else if(strcmp(sms_received_number, operatorNumber) == 0 && requestSMS == true)
 		{
 			sms.SendSMS(sms_requesting_number, sms_received_msg);
+			sms.DeleteSMS(sms_received_position);
+			requestSMS = false;
+		}
+		else
+		{
+			sms.DeleteSMS(sms_received_position);
 		}
 	}
 }
+

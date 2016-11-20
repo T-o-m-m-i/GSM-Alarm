@@ -630,7 +630,6 @@ byte GSM::IsStringReceived(char const *compare_string)
 {
      char *ch;
      byte ret_val = 0;
-
      if(comm_buf_len) {
           /*
           	#ifdef DEBUG_GSMRX
@@ -668,7 +667,7 @@ byte GSM::IsStringReceived(char const *compare_string)
 #ifdef DEBUG_ON
           Serial.print(F("ATT: "));
           Serial.println(compare_string);
-          Serial.print(F("RIC: NO STRING RCVD"));
+          Serial.println(F("RIC: NO STRING RCVD"));
 #endif
      }
 
