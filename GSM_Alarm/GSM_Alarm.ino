@@ -275,11 +275,13 @@ void checkUnreadMessages(void)
 		Serial.println("SMS: " + (String)sms_received_number);
 		Serial.println("SMS: " + (String)sms_received_msg);
 		//SALDO
-		if((strcmp(sms_received_number, number[0]) == 0) ||
-		(strcmp(sms_received_number, number[1]) == 0) ||
-		(strcmp(sms_received_number, number[2]) == 0) ||
-		(strcmp(sms_received_number, number[3]) == 0))
+		if(validNumber(sms_received_number) == true)
 		{
+		//if((strcmp(sms_received_number, number[0]) == 0) ||
+		//(strcmp(sms_received_number, number[1]) == 0) ||
+		//(strcmp(sms_received_number, number[2]) == 0) ||
+		//(strcmp(sms_received_number, number[3]) == 0))
+		//{
 			//Serial.println("Nro match.");
 			if(strcasecmp(sms_received_msg, "saldo") == 0)
 			{
@@ -322,3 +324,13 @@ void checkUnreadMessages(void)
 	}
 }
 
+bool validNumber(const char* num)
+{
+    int i;
+    for (i = 0; i < NUMBERS; i++)
+    {
+    	if(strcmp(num, number[i]) == 0)
+            return true;
+    }
+    return false;
+}
