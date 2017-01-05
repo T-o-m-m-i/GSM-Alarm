@@ -251,6 +251,7 @@ public:
      char WritePhoneNumber(byte position, const char *phone_number);
      char DelPhoneNumber(byte position);
      char ComparePhoneNumber(byte position, const char *phone_number);
+     char GetTime(char *time);
 
      // returns registration state
      byte IsRegistered(void);

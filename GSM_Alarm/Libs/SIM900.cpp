@@ -480,6 +480,86 @@ void GSM::SetSpeaker(byte off_on)
      SetCommLineStatus(CLS_FREE);
 }
 
+/*char GSM::GetTime()
+{
+	byte status;
+
+	if (CLS_FREE != GetCommLineStatus()) return "err";
+
+	SetCommLineStatus(CLS_ATCMD);
+
+	_cell.println(F("AT+CCLK?"));
+	status = WaitResp(5000, 50);
+
+	if (status == RX_FINISHED)
+	{
+		// something was received but what was received?
+		// ---------------------------------------------
+		if(IsStringReceived("+CCLK:"))
+		{
+
+		}
+	}
+	SetCommLineStatus(CLS_FREE);
+	return "a";
+}*/
+
+
+char GSM::GetTime(char *time)
+{
+     char ret_val = -1;
+
+     char *p_char;
+     char *p_char1;
+
+     if (CLS_FREE != GetCommLineStatus()) return (ret_val);
+     SetCommLineStatus(CLS_ATCMD);
+     ret_val = 0; // not found yet
+     time[0] = 0; // time not found yet => empty string
+
+     //send "AT+CPBR=XY" - where XY = position
+     _cell.print(F("AT+CCLK?"));
+     _cell.print("\r");
+
+     // 5000 msec. for initial comm tmout
+     // 50 msec. for inter character timeout
+     switch (WaitResp(5000, 50, "+CCLK"))
+     {
+		 case RX_TMOUT_ERR:
+			  // response was not received in specific time
+			  ret_val = -2;
+			  break;
+
+		 case RX_FINISHED_STR_RECV:
+			 // response
+			 //AT+CCLK?
+			 //+CCLK: "17/01/05,20:17:21+08"
+			 //OK
+			 p_char = strchr((char *)(comm_buf),'"');
+			  //p_char = strstr((char *)(comm_buf),"\"");
+			  if (p_char != NULL) {
+				   p_char++;      // we are on the first time character
+				   // find out '"' as finish character of time string
+				   p_char1 = strchr((char *)(p_char),'+');
+				   if (p_char1 != NULL) {
+						*p_char1 = 0; // end of string
+				   }
+				   // extract time string
+				   strcpy(time, (char *)(p_char));
+				   // output value = we have found out time string
+				   ret_val = 1;
+			  }
+			  break;
+
+		 case RX_FINISHED_STR_NOT_RECV:
+			  // only OK or ERROR => no time
+			  ret_val = 0;
+			  break;
+     }
+
+     SetCommLineStatus(CLS_FREE);
+     return (ret_val);
+}
 
 byte GSM::IsRegistered(void)
 {
@@ -1009,5 +1089,6 @@ char GSM::ComparePhoneNumber(byte position, const char *phone_number)
      }
      return (ret_val);
 }
+
 
 //-----------------------------------------------------
