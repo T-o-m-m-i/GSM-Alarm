@@ -1,7 +1,8 @@
 #include "Arduino.h"
+#include <SPI.h>
+#include <SD.h>
 #include "DHT.h"
 #include "SoftwareSerial.h"
-
 #include "Libs/SIM900.h"
 //#include "Libs/inetGSM.h"
 #include "Libs/sms.h"
@@ -21,6 +22,7 @@ SMSGSM sms;
 
 DHT dht(DHTPIN, DHTTYPE);
 
+char gsm_time[22];
 
 bool started = false;
 char smsbuffer[SMS_LENGTH];
@@ -44,6 +46,8 @@ bool requestSMS = false;
 byte timesDHTfailed = 0;
 bool failedAC = false;
 
+const int chipSelect = 53;  //For SD card.
+File root;
 
 const unsigned long interval = 300000;  //5min  15min=900000
 unsigned long previousMillis = 300000;
@@ -52,7 +56,7 @@ unsigned long previousMillis = 300000;
 void setup()
 {
 	//Turn internal pull-ups ON to save power
-	for(unsigned int k=0; k<=54; k++)
+	for(unsigned int k=0; k<=49; k++)
 	{
 		if(k != 8 && k != 9)
 			pinMode(k,INPUT_PULLUP);
@@ -81,7 +85,11 @@ void setup()
 		//Check if the right numbers are stored in SIM. If not, store them.
 		for(unsigned int i = 0; i < NUMBERS; i++)
 		{
-			if(gsm.ComparePhoneNumber(i+1, number[i]) == 0)
+			if(gsm.ComparePhoneNumber(i+1, number[i]) == 1)
+			{
+				Serial.println("Numero " + (String)number[i] + " oli tallennettu.");
+			}
+			else
 			{
 				if(gsm.DelPhoneNumber(i+1))
 				{
@@ -89,11 +97,9 @@ void setup()
 					Serial.println("Numero " + (String)number[i] + " tallennettiin.");
 				}
 			}
-			else
-			{
-				Serial.println("Numero " + (String)number[i] + " oli tallennettu.");
-			}
 		}
+
+		digitalWrite(13, LOW);
 
 		//Delete all SMSs
 		/*unsigned int j = 1;
@@ -102,9 +108,15 @@ void setup()
 		Serial.println("SMS " + (String)j + " poistettiin.");
 			j++;
 		}*/
-		digitalWrite(13, LOW);
-	}
 
+		Serial.println("\r\nWaiting for SD card to initialise...");
+		if (!SD.begin(chipSelect))
+		{
+		    Serial.println("Initialisation failed!");
+		    return;
+		  }
+		Serial.println("Initialisation completed.");
+	}
 }
 //---------------------------------------------------------------------------------------------
 void loop()
@@ -174,6 +186,9 @@ void loop()
 					warnSentTemp = false;
 				}
 
+				//Save to SD card
+				saveToSD(temperature, humidity);
+
 				previousMillis = millis();
 
 
@@ -184,7 +199,30 @@ void loop()
 		}
      }
 }
+bool saveToSD(float t, float h)
+{
+	File file = SD.open("data.txt", FILE_WRITE); // FILE_WRITE opens file for writing and moves to the end of the file, returns 0 if not available
+	if(file)
+	{
+		gsm.GetTime(gsm_time);
+		//Serial.println(gsm_time);
 
+		String dataStr = String(gsm_time[6]) + String(gsm_time[7]) + "."	//Day
+						+ String(gsm_time[3]) + String(gsm_time[4]) + ".20"	//Month
+						+ String(gsm_time[0]) + String(gsm_time[1]) + ","	//Year
+						+ String(gsm_time[9]) + String(gsm_time[10]) + ":"	//Hours
+						+ String(gsm_time[12]) + String(gsm_time[13]) + ":"	//Minutes
+						+ String(gsm_time[15]) + String(gsm_time[16]) + ","	//Seconds
+						+ String(t) + ","
+						+ String(h);
+		file.println(dataStr);
+		file.close();
+		Serial.println(dataStr);
+		Serial.println("Data written to SD.");
+		return 1;
+	}
+	return 0;
+}
 //Is AC failed
 //http://www.insidegadgets.com/2012/01/08/non-contact-blackout-detector/
 //http://harizanov.com/2013/08/non-contact-ac-detection/
